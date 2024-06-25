@@ -1,4 +1,4 @@
-# backend/utils/manual_vector_to_postgres.py
+# backend/manual_vector_to_postgres.py
 
 import pandas as pd
 import os
@@ -6,7 +6,6 @@ import glob
 from dotenv import load_dotenv
 import psycopg2
 import ast
-import time
 import logging
 
 load_dotenv()
@@ -45,7 +44,8 @@ create_table_query = """
 CREATE TABLE IF NOT EXISTS manual_table (
     id SERIAL PRIMARY KEY,
     file_name TEXT,
-    sheet_name TEXT,
+    file_type TEXT,
+    location TEXT,
     manual TEXT,
     manual_vector vector(3072)
 );
@@ -53,35 +53,43 @@ CREATE TABLE IF NOT EXISTS manual_table (
 cursor.execute(create_table_query)
 conn.commit()
 
-input_directory = '../data/csv/xlsx/'
-csv_files = glob.glob(os.path.join(input_directory, '*_vector_normalized.csv'))
-print(f"Found CSV files: {csv_files}")
+def process_csv_files(directory, file_type):
+    csv_files = glob.glob(os.path.join(directory, '*_vector_normalized.csv'))
+    logger.info(f"Found {file_type} CSV files: {csv_files}")
 
-# 全CSVファイルに対してベクトル化の処理を実行
-for input_file_path in csv_files:
-    df = pd.read_csv(input_file_path)
+    for input_file_path in csv_files:
+        df = pd.read_csv(input_file_path)
 
-    # ベクトルデータをPostgreSQLに挿入
-    for index, row in df.iterrows():
-        try:
-            print(f"Inserting row: {row}")
+        for index, row in df.iterrows():
+            try:
+                manual_vector = ast.literal_eval(row['manual_vector'])
+                manual_vector = [float(x) for x in manual_vector]
 
-            # ベクトルをリスト形式に変換
-            manual_vector = ast.literal_eval(row['manual_vector'])
+                location = row['page'] if file_type == 'PDF' else row['sheet_name'] if file_type == 'XLSX' else 'N/A'
 
-            # リストの各要素をfloatにキャスト
-            manual_vector = [float(x) for x in manual_vector]
+                insert_query = """
+                INSERT INTO manual_table (file_name, file_type, location, manual, manual_vector)
+                VALUES (%s, %s, %s, %s, %s);
+                """
+                cursor.execute(insert_query, (
+                    row['file_name'],
+                    file_type,
+                    location,
+                    row['manual'],
+                    manual_vector
+                ))
+                logger.info(f"Inserted row for {file_type}: {row['file_name']}")
+            except Exception as e:
+                logger.error(f"Error inserting row: {e}")
 
-            insert_query = """
-            INSERT INTO manual_table (file_name, sheet_name, manual, manual_vector)
-            VALUES (%s, %s, %s, %s);
-            """
-            cursor.execute(insert_query, (row['file_name'], row['sheet_name'], row['manual'], manual_vector))
-            print("Row inserted")
-        except Exception as e:
-            print(f"Error inserting row: {e}")
+        conn.commit()
 
-    conn.commit()
+
+process_csv_files('../data/csv/pdf/', 'PDF')
+process_csv_files('../data/csv/xlsx/', 'XLSX')
+process_csv_files('../data/csv/docx/', 'DOCX')
 
 cursor.close()
 conn.close()
+
+logger.info("All CSV files have been processed and inserted into the database.")
