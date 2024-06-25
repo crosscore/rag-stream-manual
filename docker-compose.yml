@@ -1,0 +1,75 @@
+# rag-streaming/docker-compose.yml
+
+services:
+  frontend:
+    build: ./frontend
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_URL=ws://backend:8001
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks:
+      - app-network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  backend:
+    build: ./backend
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - pgvector_manual
+      - s3_db
+    env_file:
+      - .env
+    environment:
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_DEPLOYMENT=${AZURE_OPENAI_DEPLOYMENT}
+      - AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT=${AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION}
+      - S3_DB_INTERNAL_URL=${S3_DB_INTERNAL_URL}
+      - S3_DB_EXTERNAL_URL=${S3_DB_EXTERNAL_URL}
+      - MANUAL_DB_NAME=${MANUAL_DB_NAME}
+      - MANUAL_DB_USER=${MANUAL_DB_USER}
+      - MANUAL_DB_PASSWORD=${MANUAL_DB_PASSWORD}
+      - MANUAL_DB_INTERNAL_HOST=${MANUAL_DB_INTERNAL_HOST}
+      - MANUAL_DB_INTERNAL_PORT=${MANUAL_DB_INTERNAL_PORT}
+    ports:
+      - "127.0.0.1:8001:8001"
+    networks:
+      - app-network
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+
+  pgvector_manual:
+    build: ./pgvector_manual
+    volumes:
+      - ./pgvector_manual/init_pgvector.sql:/docker-entrypoint-initdb.d/init_pgvector.sql
+      - pgvector_manual_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${MANUAL_DB_NAME}
+      - POSTGRES_USER=${MANUAL_DB_USER}
+      - POSTGRES_PASSWORD=${MANUAL_DB_PASSWORD}
+    ports:
+      - "127.0.0.1:${MANUAL_DB_EXTERNAL_PORT}:${MANUAL_DB_INTERNAL_PORT}"
+    networks:
+      - app-network
+
+  s3_db:
+    build: ./s3_db
+    volumes:
+      - ./s3_db/data:/data
+    ports:
+      - "127.0.0.1:${S3_DB_EXTERNAL_PORT}:9000"
+    networks:
+      - app-network
+    command: uvicorn main:app --host 0.0.0.0 --port 9000 --reload
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  pgvector_manual_data:

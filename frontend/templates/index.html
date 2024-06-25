@@ -1,0 +1,98 @@
+<!-- rag-streaming/frontend/templates/index.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Similar TOC Search</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <button id="theme-toggle">テーマ切り替え</button>
+    <h1>Similar TOC Search</h1>
+    <input type="text" id="searchQuestion" placeholder="Enter your question">
+    <input type="number" id="topN" value="3" min="1" max="10">
+    <button onclick="search()">Search</button>
+    <div id="results"></div>
+    <div id="pdfViewer" style="display: none;">
+        <iframe id="pdfFrame" width="100%" height="600px"></iframe>
+    </div>
+
+    <script>
+        // テーマ切り替え機能
+        function initializeTheme() {
+            const themeToggle = document.getElementById('theme-toggle');
+            const theme = localStorage.getItem('theme') || 'dark';
+
+            console.log('Current theme:', theme);
+
+            if (theme === 'light') {
+                document.body.classList.add('light-mode');
+                console.log('Light mode applied');
+            }
+
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('light-mode');
+                const newTheme = document.body.classList.contains('light-mode') ? 'light' : 'dark';
+                localStorage.setItem('theme', newTheme);
+                console.log('Theme toggled to:', newTheme);
+            });
+        }
+
+        // WebSocket接続と検索機能
+        function initializeWebSocket() {
+            const socket = new WebSocket(`ws://${window.location.host}/ws`);
+            const resultsDiv = document.getElementById('results');
+            const pdfViewer = document.getElementById('pdfViewer');
+            const pdfFrame = document.getElementById('pdfFrame');
+
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                console.log('Received data:', data);  // debug
+
+                if (data.error) {
+                    resultsDiv.innerHTML = `<p>Error: ${data.error}</p>`;
+                    return;
+                }
+
+                if (Array.isArray(data.results)) {
+                    const results = data.results;
+                    let resultsHtml = '<h2>Search Results:</h2>';
+                    results.forEach((result, index) => {
+                        resultsHtml += `
+                            <div>
+                                <h3>${index + 1}. <a href="${result.link}" target="_blank">${result.link_text}</a></h3>
+                                <p>Manual: ${result.manual}</p>
+                                <p>Distance: ${result.distance.toFixed(4)}</p>
+                            </div>
+                        `;
+                    });
+                    resultsDiv.innerHTML = resultsHtml;
+                } else {
+                    console.error('Unexpected data format:', data);
+                    resultsDiv.innerHTML = '<p>Error: Unexpected data format received</p>';
+                }
+            };
+
+            window.search = function() {
+                const question = document.getElementById('searchQuestion').value;
+                const topN = parseInt(document.getElementById('topN').value);
+                resultsDiv.innerHTML = 'Searching...';
+                socket.send(JSON.stringify({ question: question, top_n: topN }));
+            };
+
+            window.showPDF = function(url) {
+                console.log("Opening PDF:", url);
+                window.open(url, '_blank');
+            };
+        }
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM fully loaded');
+            initializeTheme();
+            initializeWebSocket();
+        });
+    </script>
+</body>
+</html>
