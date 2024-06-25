@@ -31,7 +31,6 @@
             });
         }
 
-
         function initializeWebSocket() {
             const socket = new WebSocket(`ws://${window.location.host}/ws`);
             const resultsDiv = document.getElementById('results');
@@ -58,7 +57,7 @@
                         resultsHtml += `
                             <div>
                                 <h3>${index + 1}. ${result.link
-                                    ? `<a href="${result.link}" target="_blank">${result.link_text}</a>`
+                                    ? `<a href="${result.link}${result.link.includes('?') ? '&' : '?'}page=${result.location}" target="_blank">${result.link_text}</a>`
                                     : `<span onclick="showContent('content-${index}')">${result.link_text}</span>`}
                                 </h3>
                                 <p>File Type: ${result.file_type}</p>

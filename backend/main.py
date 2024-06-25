@@ -7,13 +7,12 @@ import psycopg2
 import numpy as np
 from dotenv import load_dotenv
 import os
-from langchain_openai import AzureOpenAIEmbeddings
+from langchain_openai import AzureOpenAIEmbeddings, OpenAIEmbeddings
 from starlette.websockets import WebSocketDisconnect
 import logging
 
 load_dotenv()
 
-# Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -27,12 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Environment variables
-AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
-AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
-AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT")
-AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT = os.getenv("AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT")
-AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MANUAL_DB_NAME = os.getenv("MANUAL_DB_NAME")
 MANUAL_DB_USER = os.getenv("MANUAL_DB_USER")
 MANUAL_DB_PASSWORD = os.getenv("MANUAL_DB_PASSWORD")
@@ -42,9 +36,8 @@ S3_DB_EXTERNAL_PORT = os.getenv("S3_DB_EXTERNAL_PORT", "9001")
 
 logger.info(f"Database connection details: {MANUAL_DB_NAME}@{MANUAL_DB_HOST}:{MANUAL_DB_PORT}")
 
-embeddings = AzureOpenAIEmbeddings(
-    azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    azure_deployment=AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT,
+embeddings = OpenAIEmbeddings(
+    model="text-embedding-3-large"
 )
 
 def normalize_vector(vector):
