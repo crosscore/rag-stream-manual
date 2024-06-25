@@ -10,12 +10,21 @@
 <body>
     <button id="theme-toggle">テーマ切り替え</button>
     <h1>Similar TOC Search</h1>
+    <div>
+        <label class="switch">
+            <input type="checkbox" id="display-mode-toggle">
+            <span class="slider"></span>
+        </label>
+        <span id="display-mode-label">インライン表示</span>
+    </div>
     <input type="text" id="searchQuestion" placeholder="Enter your question">
     <input type="number" id="topN" value="3" min="1" max="10">
     <button onclick="search()">Search</button>
     <div id="results"></div>
 
     <script>
+        let displayMode = 'inline';
+
         function initializeTheme() {
             const themeToggle = document.getElementById('theme-toggle');
             const theme = localStorage.getItem('theme') || 'dark';
@@ -100,12 +109,27 @@
 
         function showContent(id) {
             const content = document.getElementById(id);
-            content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            if (displayMode === 'inline') {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            } else {
+                const contentText = content.innerText;
+                const newWindow = window.open('', '_blank');
+                newWindow.document.write('<pre>' + contentText + '</pre>');
+                newWindow.document.close();
+            }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             initializeTheme();
             initializeWebSocket();
+
+            const displayModeToggle = document.getElementById('display-mode-toggle');
+            const displayModeLabel = document.getElementById('display-mode-label');
+
+            displayModeToggle.addEventListener('change', () => {
+                displayMode = displayModeToggle.checked ? 'new-tab' : 'inline';
+                displayModeLabel.textContent = displayMode === 'inline' ? 'インライン表示' : '新しいタブで表示';
+            });
         });
     </script>
 </body>
