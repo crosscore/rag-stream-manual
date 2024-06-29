@@ -89,3 +89,24 @@ MANUAL_DB_INTERNAL_HOST=pgvector_manual
 MANUAL_DB_INTERNAL_PORT=5432
 MANUAL_DB_EXTERNAL_HOST=localhost
 MANUAL_DB_EXTERNAL_PORT=5434
+
+
+# docker-compose.yml
+service:
+
+  backend:
+    build: ./backend
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - pgvector_manual
+      - s3_db
+    env_file:
+      - .env
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_DEPLOYMENT=${AZURE_OPENAI_DEPLOYMENT}
+      - AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT=${AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION}
