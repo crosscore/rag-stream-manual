@@ -1,3 +1,5 @@
+# rag-stream-manual/backend/utils/vectorizer.py
+
 import os
 import requests
 import pandas as pd
@@ -57,12 +59,12 @@ def fetch_file_content(file_type, file_name):
 
 def extract_text(content, file_type):
     if file_type == 'pdf':
-        return [page.extract_text() for page in PdfReader(BytesIO(content)).pages]
+        return [(str(i+1), page.extract_text()) for i, page in enumerate(PdfReader(BytesIO(content)).pages)]
     elif file_type == 'xlsx':
         workbook = load_workbook(filename=BytesIO(content), read_only=True)
-        return [XLSX_SEPARATOR.join([" ".join([str(cell.value) for cell in row if cell.value is not None]) for row in sheet.iter_rows()]) for sheet in workbook]
+        return [(sheet.title, XLSX_SEPARATOR.join([" ".join([str(cell.value) for cell in row if cell.value is not None]) for row in sheet.iter_rows()])) for sheet in workbook]
     elif file_type == 'docx':
-        return [SEPARATOR.join([para.text for para in Document(BytesIO(content)).paragraphs])]
+        return [('1', SEPARATOR.join([para.text for para in Document(BytesIO(content)).paragraphs]))]
 
 def process_file(file_type, file_name):
     content = fetch_file_content(file_type, file_name)
@@ -77,13 +79,13 @@ def process_file(file_type, file_name):
     )
 
     processed_data = []
-    for i, text in enumerate(texts, start=1):
+    for location, text in texts:
         for chunk in text_splitter.split_text(text):
             vector = embeddings.embed_query(chunk)
             processed_data.append({
                 'file_name': file_name,
                 'file_type': file_type.upper(),
-                'location': str(i),
+                'location': location,
                 'manual': chunk,
                 'manual_vector': normalize_vector(vector).tolist()
             })
