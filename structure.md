@@ -13,7 +13,7 @@ rag-streaming/
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── utils/
-│       └── vector_to_postgres.py
+│       └── vectorizer.py
 │
 ├── pgvector_manual/
 │   ├── Dockerfile

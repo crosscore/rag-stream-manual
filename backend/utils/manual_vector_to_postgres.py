@@ -62,7 +62,6 @@ def process_csv_file(file_path):
             # Convert string representation of list to actual list
             if isinstance(manual_vector, str):
                 manual_vector = eval(manual_vector)
-
             # Ensure the vector has the correct dimension
             if len(manual_vector) != 3072:
                 logger.warning(f"Incorrect vector dimension for row {index}. Expected 3072, got {len(manual_vector)}. Skipping.")
