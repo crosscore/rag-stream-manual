@@ -61,7 +61,7 @@ CREATE INDEX ON toc_table USING hnsw (toc_halfvec halfvec_ip_ops);
 
 # .env
 
-CHUNK_SIZE=300
+CHUNK_SIZE=30
 CHUNK_OVERLAP=0
 SEPARATOR="\n\n"
 

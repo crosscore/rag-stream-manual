@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-CHUNK_SIZE = 300
-CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", 0))
+CHUNK_SIZE = 30
+CHUNK_OVERLAP = 0
 SEPARATOR = "\n\n"
 CSV_OUTPUT_DIR = os.getenv("CSV_OUTPUT_DIR", "../data/csv/all")
 
