@@ -14,7 +14,7 @@ unstructured
 networkx
 python-docx
 PyMuPDF
-PyPDF2
+pypdf
 
 docx2pdf
 xlrd

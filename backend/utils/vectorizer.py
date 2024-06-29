@@ -5,7 +5,7 @@ import requests
 import pandas as pd
 import numpy as np
 from io import BytesIO
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 from docx import Document
 from openpyxl import load_workbook
 from langchain.text_splitter import CharacterTextSplitter
@@ -59,13 +59,14 @@ def fetch_file_content(file_type, file_name):
 
 def extract_text(content, file_type):
     if file_type == 'pdf':
-        return [(str(i+1), page.extract_text()) for i, page in enumerate(PdfReader(BytesIO(content)).pages)]
+        pdf = PdfReader(BytesIO(content))
+        return [(str(i+1), page.extract_text()) for i, page in enumerate(pdf.pages)]
     elif file_type == 'xlsx':
         workbook = load_workbook(filename=BytesIO(content), read_only=True)
         return [(sheet.title, XLSX_SEPARATOR.join([" ".join([str(cell.value) for cell in row if cell.value is not None]) for row in sheet.iter_rows()])) for sheet in workbook]
     elif file_type == 'docx':
         return [('1', SEPARATOR.join([para.text for para in Document(BytesIO(content)).paragraphs]))]
-
+    
 def process_file(file_type, file_name):
     content = fetch_file_content(file_type, file_name)
     if content is None:
