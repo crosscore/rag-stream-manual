@@ -4,7 +4,9 @@ import pandas as pd
 import os
 from dotenv import load_dotenv
 import psycopg2
+from psycopg2.extras import execute_batch
 import logging
+from contextlib import contextmanager
 
 load_dotenv()
 
@@ -13,87 +15,86 @@ logger = logging.getLogger(__name__)
 
 is_docker = os.getenv("IS_DOCKER", "false").lower() == "true"
 CSV_OUTPUT_DIR = os.getenv("CSV_OUTPUT_DIR", "../data/csv/all")
+BATCH_SIZE = 1000  # Number of rows to insert in a single batch
 
-try:
-    if is_docker:
-        host = os.environ["MANUAL_DB_INTERNAL_HOST"]
-        port = int(os.environ["MANUAL_DB_INTERNAL_PORT"])
-    else:
-        host = os.environ["MANUAL_DB_EXTERNAL_HOST"]
-        port = int(os.environ["MANUAL_DB_EXTERNAL_PORT"])
+@contextmanager
+def get_db_connection():
+    conn = None
+    try:
+        host = os.environ["MANUAL_DB_INTERNAL_HOST" if is_docker else "MANUAL_DB_EXTERNAL_HOST"]
+        port = int(os.environ["MANUAL_DB_INTERNAL_PORT" if is_docker else "MANUAL_DB_EXTERNAL_PORT"])
+        conn = psycopg2.connect(
+            dbname=os.environ["MANUAL_DB_NAME"],
+            user=os.environ["MANUAL_DB_USER"],
+            password=os.environ["MANUAL_DB_PASSWORD"],
+            host=host,
+            port=port
+        )
+        logger.info(f"Connected to database: {host}:{port}")
+        yield conn
+    except (KeyError, psycopg2.Error) as e:
+        logger.error(f"Database connection error: {e}")
+        raise
+    finally:
+        if conn is not None:
+            conn.close()
+            logger.info("Database connection closed")
 
-    conn = psycopg2.connect(
-        dbname=os.environ["MANUAL_DB_NAME"],
-        user=os.environ["MANUAL_DB_USER"],
-        password=os.environ["MANUAL_DB_PASSWORD"],
-        host=host,
-        port=port
-    )
-    logger.info(f"Connected to database: {host}:{port}")
-except KeyError as e:
-    logger.error(f"Environment variable not set: {e}")
-    raise
-except psycopg2.Error as e:
-    logger.error(f"Unable to connect to the database: {e}")
-    raise
+def create_table(cursor):
+    create_table_query = """
+    CREATE TABLE IF NOT EXISTS manual_table (
+        id SERIAL PRIMARY KEY,
+        file_name TEXT,
+        file_type TEXT,
+        location TEXT,
+        manual TEXT,
+        manual_vector vector(3072)
+    );
+    """
+    cursor.execute(create_table_query)
 
-cursor = conn.cursor()
-
-create_table_query = """
-CREATE TABLE IF NOT EXISTS manual_table (
-    id SERIAL PRIMARY KEY,
-    file_name TEXT,
-    file_type TEXT,
-    location TEXT,
-    manual TEXT,
-    manual_vector vector(3072)
-);
-"""
-cursor.execute(create_table_query)
-conn.commit()
-
-def process_csv_file(file_path):
+def process_csv_file(file_path, conn):
     logger.info(f"Processing CSV file: {file_path}")
     df = pd.read_csv(file_path)
 
-    for index, row in df.iterrows():
-        try:
+    with conn.cursor() as cursor:
+        create_table(cursor)
+
+        insert_query = """
+        INSERT INTO manual_table (file_name, file_type, location, manual, manual_vector)
+        VALUES (%s, %s, %s, %s, %s);
+        """
+
+        data = []
+        for _, row in df.iterrows():
             manual_vector = row['manual_vector']
-            # Convert string representation of list to actual list
             if isinstance(manual_vector, str):
                 manual_vector = eval(manual_vector)
-            # Ensure the vector has the correct dimension
             if len(manual_vector) != 3072:
-                logger.warning(f"Incorrect vector dimension for row {index}. Expected 3072, got {len(manual_vector)}. Skipping.")
+                logger.warning(f"Incorrect vector dimension for row. Expected 3072, got {len(manual_vector)}. Skipping.")
                 continue
+            data.append((row['file_name'], row['file_type'], row['location'], row['manual'], manual_vector))
 
-            insert_query = """
-            INSERT INTO manual_table (file_name, file_type, location, manual, manual_vector)
-            VALUES (%s, %s, %s, %s, %s);
-            """
-            cursor.execute(insert_query, (
-                row['file_name'],
-                row['file_type'],
-                row['location'],
-                row['manual'],
-                manual_vector
-            ))
-            logger.info(f"Inserted row {index} for file: {row['file_name']}")
+        try:
+            execute_batch(cursor, insert_query, data, page_size=BATCH_SIZE)
+            conn.commit()
+            logger.info(f"Inserted {len(data)} rows into the database")
         except Exception as e:
-            logger.error(f"Error inserting row {index}: {e}")
-
-    conn.commit()
+            conn.rollback()
+            logger.error(f"Error inserting batch: {e}")
 
 def main():
     csv_file = os.path.join(CSV_OUTPUT_DIR, "all_documents_vector_normalized.csv")
-    if os.path.exists(csv_file):
-        process_csv_file(csv_file)
-        logger.info("CSV file has been processed and inserted into the database.")
-    else:
+    if not os.path.exists(csv_file):
         logger.error(f"CSV file not found: {csv_file}")
+        return
 
-    cursor.close()
-    conn.close()
+    try:
+        with get_db_connection() as conn:
+            process_csv_file(csv_file, conn)
+        logger.info("CSV file has been processed and inserted into the database.")
+    except Exception as e:
+        logger.error(f"An error occurred during processing: {e}")
 
 if __name__ == "__main__":
     main()
