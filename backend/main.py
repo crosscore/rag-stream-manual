@@ -32,7 +32,7 @@ MANUAL_DB_PASSWORD = os.getenv("MANUAL_DB_PASSWORD")
 MANUAL_DB_HOST = os.getenv("MANUAL_DB_INTERNAL_HOST") if os.getenv("IS_DOCKER", "false").lower() == "true" else os.getenv("MANUAL_DB_EXTERNAL_HOST")
 MANUAL_DB_PORT = os.getenv("MANUAL_DB_INTERNAL_PORT") if os.getenv("IS_DOCKER", "false").lower() == "true" else os.getenv("MANUAL_DB_EXTERNAL_PORT")
 S3_DB_EXTERNAL_PORT = os.getenv("S3_DB_EXTERNAL_PORT", "9001")
-SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", 0))
+SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", 0.5))
 
 logger.info(f"Application initialized with SCORE_THRESHOLD: {SCORE_THRESHOLD}")
 
@@ -67,9 +67,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 ) as conn:
                     with conn.cursor() as cursor:
                         similarity_search_query = """
-                        SELECT file_name, file_type, location, manual, manual_vector, (manual_vector <#> %s::vector) AS distance
+                        SELECT file_name, file_type, location, manual, manual_vector, (manual_vector <=> %s::vector) AS distance
                         FROM manual_table
-                        WHERE (manual_vector <#> %s::vector) <= %s
+                        WHERE (manual_vector <=> %s::vector) <= %s
                         ORDER BY distance ASC
                         LIMIT %s;
                         """

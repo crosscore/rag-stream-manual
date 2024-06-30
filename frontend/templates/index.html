@@ -19,7 +19,7 @@
     </div>
     <input type="text" id="searchQuestion" placeholder="Enter your question">
     <input type="number" id="topN" value="20" min="1" max="100">
-    <input type="number" id="scoreThreshold" value="0" min="-1" max="1" step="0.1">
+    <input type="number" id="scoreThreshold" value="1.0" min="0" max="2" step="0.1">
     <button onclick="search()">Search</button>
     <div id="results"></div>
 
@@ -72,7 +72,7 @@
                                 </h3>
                                 <p>File Type: ${result.file_type}</p>
                                 <p>Location: ${result.location}</p>
-                                <p>Distance: ${result.distance.toFixed(4)}</p>
+                                <p>Distance: ${result.distance.toFixed(4)} (lower is more similar)</p>
                                 ${result.content
                                     ? `<div id="content-${index}" style="display:none;"><pre>${result.content}</pre></div>`
                                     : ''}
