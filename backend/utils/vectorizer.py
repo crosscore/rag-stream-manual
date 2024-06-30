@@ -66,7 +66,7 @@ def extract_text(content, file_type):
         return [(sheet.title, XLSX_SEPARATOR.join([" ".join([str(cell.value) for cell in row if cell.value is not None]) for row in sheet.iter_rows()])) for sheet in workbook]
     elif file_type == 'docx':
         return [('1', SEPARATOR.join([para.text for para in Document(BytesIO(content)).paragraphs]))]
-    
+
 def process_file(file_type, file_name):
     content = fetch_file_content(file_type, file_name)
     if content is None:
