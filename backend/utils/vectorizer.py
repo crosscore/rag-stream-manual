@@ -13,7 +13,7 @@ from langchain_openai import AzureOpenAIEmbeddings, OpenAIEmbeddings
 from dotenv import load_dotenv
 import logging
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 load_dotenv()
@@ -28,7 +28,7 @@ CSV_OUTPUT_DIR = os.getenv("CSV_OUTPUT_DIR", "../data/csv/all")
 is_docker = os.getenv("IS_DOCKER", "false").lower() == "true"
 S3_DB_URL = os.getenv("S3_DB_INTERNAL_URL" if is_docker else "S3_DB_EXTERNAL_URL", "http://localhost:9001")
 
-logger.info(f"Using S3_DB_URL: {S3_DB_URL}")
+logger.info(f"Initializing vectorizer with S3_DB_URL: {S3_DB_URL}")
 
 embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
 
@@ -41,9 +41,9 @@ def get_files_from_s3(file_type):
         response.raise_for_status()
         files = response.json()
         valid_files = [file for file in files if file.endswith(f'.{file_type}')]
-        logger.info(f"Found {len(valid_files)} {file_type.upper()} files: {valid_files}")
+        logger.info(f"Found {len(valid_files)} {file_type.upper()} files")
         return valid_files
-    except Exception as e:
+    except requests.RequestException as e:
         logger.error(f"Error fetching {file_type.upper()} files: {str(e)}")
         return []
 
@@ -51,21 +51,24 @@ def fetch_file_content(file_type, file_name):
     try:
         response = requests.get(f"{S3_DB_URL}/data/{file_type}/{file_name}", stream=True, timeout=10)
         response.raise_for_status()
-        logger.info(f"Successfully fetched {file_type.upper()} file: {file_name}")
         return response.content
-    except Exception as e:
+    except requests.RequestException as e:
         logger.error(f"Error fetching {file_type.upper()} file {file_name}: {str(e)}")
         return None
 
 def extract_text(content, file_type):
-    if file_type == 'pdf':
-        pdf = PdfReader(BytesIO(content))
-        return [(str(i+1), page.extract_text()) for i, page in enumerate(pdf.pages)]
-    elif file_type == 'xlsx':
-        workbook = load_workbook(filename=BytesIO(content), read_only=True)
-        return [(sheet.title, XLSX_SEPARATOR.join([" ".join([str(cell.value) for cell in row if cell.value is not None]) for row in sheet.iter_rows()])) for sheet in workbook]
-    elif file_type == 'docx':
-        return [('1', SEPARATOR.join([para.text for para in Document(BytesIO(content)).paragraphs]))]
+    try:
+        if file_type == 'pdf':
+            pdf = PdfReader(BytesIO(content))
+            return [(str(i+1), page.extract_text()) for i, page in enumerate(pdf.pages)]
+        elif file_type == 'xlsx':
+            workbook = load_workbook(filename=BytesIO(content), read_only=True)
+            return [(sheet.title, XLSX_SEPARATOR.join([" ".join([str(cell.value) for cell in row if cell.value is not None]) for row in sheet.iter_rows()])) for sheet in workbook]
+        elif file_type == 'docx':
+            return [('1', SEPARATOR.join([para.text for para in Document(BytesIO(content)).paragraphs]))]
+    except Exception as e:
+        logger.error(f"Error extracting text from {file_type} file: {str(e)}")
+        return []
 
 def process_file(file_type, file_name):
     content = fetch_file_content(file_type, file_name)
@@ -73,6 +76,10 @@ def process_file(file_type, file_name):
         return pd.DataFrame()
 
     texts = extract_text(content, file_type)
+    if not texts:
+        logger.warning(f"No text extracted from {file_type} file: {file_name}")
+        return pd.DataFrame()
+
     text_splitter = CharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,
@@ -91,6 +98,7 @@ def process_file(file_type, file_name):
                 'manual_vector': normalize_vector(vector).tolist()
             })
 
+    logger.info(f"Processed {len(processed_data)} chunks from {file_name}")
     return pd.DataFrame(processed_data)
 
 def main():
