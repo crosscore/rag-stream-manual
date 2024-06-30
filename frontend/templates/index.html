@@ -8,17 +8,18 @@
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <button id="theme-toggle">テーマ切り替え</button>
+    <button id="theme-toggle">Theme Switch</button>
     <h1>Similar TOC Search</h1>
     <div>
         <label class="switch">
             <input type="checkbox" id="display-mode-toggle">
             <span class="slider"></span>
         </label>
-        <span id="display-mode-label">インライン表示</span>
+        <span id="display-mode-label">Inline Display</span>
     </div>
     <input type="text" id="searchQuestion" placeholder="Enter your question">
-    <input type="number" id="topN" value="3" min="1" max="10">
+    <input type="number" id="topN" value="20" min="1" max="100">
+    <input type="number" id="scoreThreshold" value="0" min="-1" max="1" step="0.1">
     <button onclick="search()">Search</button>
     <div id="results"></div>
 
@@ -99,11 +100,12 @@
         function search() {
             const question = document.getElementById('searchQuestion').value;
             const topN = parseInt(document.getElementById('topN').value);
+            const scoreThreshold = parseFloat(document.getElementById('scoreThreshold').value);
             document.getElementById('results').innerHTML = 'Searching...';
-            console.log("Sending search request:", { question, top_n: topN });
+            console.log("Sending search request:", { question, top_n: topN, score_threshold: scoreThreshold });
             const socket = initializeWebSocket();
             socket.onopen = () => {
-                socket.send(JSON.stringify({ question, top_n: topN }));
+                socket.send(JSON.stringify({ question, top_n: topN, score_threshold: scoreThreshold }));
             };
         }
 
@@ -128,7 +130,7 @@
 
             displayModeToggle.addEventListener('change', () => {
                 displayMode = displayModeToggle.checked ? 'new-tab' : 'inline';
-                displayModeLabel.textContent = displayMode === 'inline' ? 'インライン表示' : '新しいタブで表示';
+                displayModeLabel.textContent = displayMode === 'inline' ? 'Inline Display' : 'Open in new tab';
             });
         });
     </script>

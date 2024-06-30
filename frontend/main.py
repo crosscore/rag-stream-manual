@@ -1,6 +1,6 @@
 # rag-streaming/frontend/main.py
 
-from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect, Query
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 import os
