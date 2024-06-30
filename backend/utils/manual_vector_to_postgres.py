@@ -62,7 +62,7 @@ def process_csv_file(file_path, conn):
 
         insert_query = """
         INSERT INTO manual_table (file_name, file_type, location, manual, manual_vector)
-        VALUES (%s, %s, %s, %s, %s);
+        VALUES (%s, %s, %s, %s, %s::vector);
         """
 
         data = []

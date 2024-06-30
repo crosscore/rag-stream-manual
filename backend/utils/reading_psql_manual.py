@@ -1,48 +1,79 @@
-# backend/utils/postgres_manual_reader_sqlalchemy.py
+# rag-stream-manual/backend/utils/reading_psql_manual.py
 
 import os
-import pandas as pd
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+import pandas as pd
+from sqlalchemy import create_engine, inspect
 import ast
+import logging
+
+logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-def get_env_variable(var_name, default=None):
-    value = os.getenv(var_name, default)
-    if value is None:
-        raise ValueError(f"Environment variable {var_name} is not set")
-    return value
+def get_db_url():
+    is_docker = os.getenv("IS_DOCKER", "false").lower() == "true"
+    host_key = "MANUAL_DB_INTERNAL_HOST" if is_docker else "MANUAL_DB_EXTERNAL_HOST"
+    port_key = "MANUAL_DB_INTERNAL_PORT" if is_docker else "MANUAL_DB_EXTERNAL_PORT"
 
-MANUAL_DB_NAME = get_env_variable("MANUAL_DB_NAME")
-MANUAL_DB_USER = get_env_variable("MANUAL_DB_USER")
-MANUAL_DB_PASSWORD = get_env_variable("MANUAL_DB_PASSWORD")
+    return "postgresql://{user}:{password}@{host}:{port}/{dbname}".format(
+        user=os.getenv("MANUAL_DB_USER"),
+        password=os.getenv("MANUAL_DB_PASSWORD"),
+        host=os.getenv(host_key, "localhost"),
+        port=os.getenv(port_key),
+        dbname=os.getenv("MANUAL_DB_NAME")
+    )
 
-is_docker = os.getenv("IS_DOCKER", "false").lower() == "true"
-if is_docker:
-    MANUAL_DB_HOST = get_env_variable("MANUAL_DB_INTERNAL_HOST")
-    MANUAL_DB_PORT = get_env_variable("MANUAL_DB_INTERNAL_PORT")
-else:
-    MANUAL_DB_HOST = get_env_variable("MANUAL_DB_EXTERNAL_HOST", "localhost")
-    MANUAL_DB_PORT = get_env_variable("MANUAL_DB_EXTERNAL_PORT")
+def get_table_structure(engine):
+    inspector = inspect(engine)
+    columns = inspector.get_columns('manual_table')
+    return columns
 
-# SQLAlchemyエンジンの作成
-POSTGRES_MANUAL_URL = f"postgresql://{MANUAL_DB_USER}:{MANUAL_DB_PASSWORD}@{MANUAL_DB_HOST}:{MANUAL_DB_PORT}/{MANUAL_DB_NAME}"
+def read_manual_data():
+    try:
+        engine = create_engine(get_db_url())
+        query = "SELECT * FROM manual_table"
+        df = pd.read_sql(query, engine)
+        df['manual_vector'] = df['manual_vector'].apply(ast.literal_eval)
+        return engine, df
+    except Exception as e:
+        logger.error(f"データの読み込み中にエラーが発生しました: {e}")
+        raise
 
-try:
-    engine = create_engine(POSTGRES_MANUAL_URL)
+def print_table_info(df):
+    print("\n------ Table Info ------")
+    print(f"Number of rows: {len(df)}")
+    print(f"Number of columns: {len(df.columns)}")
+    print("\nColumn Info:")
+    for col in df.columns:
+        print(f"  - {col}: {df[col].dtype}")
 
-    query = "SELECT * FROM manual_table"
-    df = pd.read_sql(query, engine)
+def print_sample_data(df):
+    print("\n------ Sample Data (1st one) ------")
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', None)
+    pd.set_option('display.max_colwidth', None)
+    print(f"\n{df.head(1).to_string()}")
 
-    # manual_vectorカラムをリストに変換
-    df['manual_vector'] = df['manual_vector'].apply(ast.literal_eval)
-    print(df)
-    print("---------")
+def main():
+    try:
+        engine, df = read_manual_data()
 
-    for i in range(min(10, len(df))):
-        print(f"Length of manual_vector at index {i}: {len(df['manual_vector'][i])}")
+        table_structure = get_table_structure(engine)
+        print("------ Table Structure ------")
+        for column in table_structure:
+            print(f"  - {column['name']}: {column['type']}")
 
-except Exception as e:
-    print(f"An error occurred: {e}")
-    raise
+        print_table_info(df)
+        print_sample_data(df)
+
+        print("\n------ manual_vector length ------")
+        for i in range(min(10, len(df))):
+            print(f"len(df['manual_vector'][{i}]): {len(df['manual_vector'][i])}")
+
+    except Exception as e:
+        logger.error(f"予期せぬエラーが発生しました: {e}")
+
+if __name__ == "__main__":
+    main()

@@ -21,13 +21,13 @@ docker build --pull --build-arg PG_MAJOR=16 -t myuser/pgvector .
 # pgvector拡張機能を有効化
 CREATE EXTENSION IF NOT EXISTS vector;
 
-psql -U user -d tocdb
+psql -U user -d manualdb
 
 # コンテナ外部から接続
-psql -h localhost -U user -d toc_db -p 5432
+psql -h localhost -U user -d manualdb -p 5432
 
 # コンテナ内部から接続
-psql -h pgvector_db -U user -d toc_db -p 5432
+psql -h pgvector_db -U user -d manualdb -p 5432
 
 # .env
 OPENAI_API_KEY=api_key
@@ -55,9 +55,6 @@ CREATE TABLE IF NOT EXISTS toc_table (
 );
 
 CREATE INDEX ON toc_table USING hnsw (toc_halfvec halfvec_ip_ops);
-
-\d+ documents
-
 
 # .env
 

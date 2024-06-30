@@ -9,7 +9,7 @@ from pypdf import PdfReader
 from docx import Document
 from openpyxl import load_workbook
 from langchain.text_splitter import CharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
+from langchain_openai import AzureOpenAIEmbeddings, OpenAIEmbeddings
 from dotenv import load_dotenv
 import logging
 
