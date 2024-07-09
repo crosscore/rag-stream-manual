@@ -3,7 +3,7 @@
 import os
 from dotenv import load_dotenv
 import pandas as pd
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 import ast
 import logging
 
@@ -29,6 +29,40 @@ def get_table_structure(engine):
     inspector = inspect(engine)
     columns = inspector.get_columns('manual_table')
     return columns
+
+def get_index_info(engine):
+    with engine.connect() as connection:
+        query = text("""
+        SELECT
+            i.relname AS index_name,
+            a.attname AS column_name,
+            ix.indisprimary AS is_primary,
+            ix.indisunique AS is_unique,
+            am.amname AS index_type,
+            pg_get_indexdef(i.oid) AS index_definition
+        FROM
+            pg_index ix
+            JOIN pg_class i ON i.oid = ix.indexrelid
+            JOIN pg_class t ON t.oid = ix.indrelid
+            JOIN pg_am am ON i.relam = am.oid
+            LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+        WHERE
+            t.relname = 'manual_table'
+        ORDER BY
+            i.relname, a.attnum;
+        """)
+        result = connection.execute(query)
+        return result.fetchall()
+
+def get_hnsw_index_settings(engine):
+    with engine.connect() as connection:
+        query = text("""
+        SELECT reloptions
+        FROM pg_class
+        WHERE relname = 'hnsw_manual_vector_idx';
+        """)
+        result = connection.execute(query)
+        return result.fetchone()
 
 def read_manual_data():
     try:
@@ -66,6 +100,20 @@ def main():
         logger.info("------ テーブル構造 ------")
         for column in table_structure:
             logger.info(f"  - {column['name']}: {column['type']}")
+
+        logger.info("\n------ インデックス情報 ------")
+        index_info = get_index_info(engine)
+        for index in index_info:
+            logger.info(f"インデックス名: {index.index_name}")
+            logger.info(f"  カラム: {index.column_name}")
+            logger.info(f"  タイプ: {index.index_type}")
+            logger.info(f"  定義: {index.index_definition}")
+            logger.info("  ---")
+
+        hnsw_settings = get_hnsw_index_settings(engine)
+        if hnsw_settings:
+            logger.info("\n------ HNSWインデックス設定 ------")
+            logger.info(f"設定: {hnsw_settings[0]}")
 
         log_table_info(df)
         log_sample_data(df)

@@ -49,14 +49,14 @@ def create_table_and_index(cursor):
         file_type TEXT,
         location TEXT,
         manual TEXT,
-        manual_vector halfvec(3072)
+        manual_vector vector(3072)
     );
     """
     cursor.execute(create_table_query)
 
     create_index_query = """
     CREATE INDEX IF NOT EXISTS hnsw_manual_vector_idx ON manual_table
-    USING hnsw (manual_vector halfvec_ip_ops)
+    USING hnsw ((manual_vector::halfvec(3072)) halfvec_ip_ops)
     WITH (m = 16, ef_construction = 256);
     """
     cursor.execute(create_index_query)
@@ -72,7 +72,7 @@ def process_csv_file(file_path, conn):
 
         insert_query = """
         INSERT INTO manual_table (file_name, file_type, location, manual, manual_vector)
-        VALUES (%s, %s, %s, %s, %s::halfvec);
+        VALUES (%s, %s, %s, %s, %s::vector(3072));
         """
 
         data = []
@@ -84,10 +84,8 @@ def process_csv_file(file_path, conn):
                 logger.warning(f"Incorrect vector dimension for row. Expected 3072, got {len(manual_vector)}. Skipping.")
                 continue
 
-            # Convert to halfvec (float16)
-            halfvec = np.array(manual_vector, dtype=np.float16).tobytes()
-
-            data.append((row['file_name'], row['file_type'], row['location'], row['manual'], halfvec))
+            # ベクトルはそのまま4バイトfloatで保存
+            data.append((row['file_name'], row['file_type'], row['location'], row['manual'], manual_vector))
 
         try:
             execute_batch(cursor, insert_query, data, page_size=BATCH_SIZE)
