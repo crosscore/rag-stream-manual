@@ -1,4 +1,4 @@
-# backend/manual_vector_to_postgres.py
+# backend/manual_halfvec_to_postgres.py
 
 import pandas as pd
 import os
