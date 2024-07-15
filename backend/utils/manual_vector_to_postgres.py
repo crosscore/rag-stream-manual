@@ -7,6 +7,7 @@ import psycopg2
 from psycopg2.extras import execute_batch
 import logging
 from contextlib import contextmanager
+import numpy as np
 
 load_dotenv()
 
@@ -15,7 +16,12 @@ logger = logging.getLogger(__name__)
 
 is_docker = os.getenv("IS_DOCKER", "false").lower() == "true"
 CSV_OUTPUT_DIR = os.getenv("CSV_OUTPUT_DIR", "../data/csv/all")
-BATCH_SIZE = 1000  # Number of rows to insert in a single batch
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "1000"))
+INDEX_TYPE = os.getenv("INDEX_TYPE", "hnsw").lower()  # "hnsw", "ivfflat", or "none"
+HNSW_M = int(os.getenv("HNSW_M", "16"))
+HNSW_EF_CONSTRUCTION = int(os.getenv("HNSW_EF_CONSTRUCTION", "256"))
+IVFFLAT_LISTS = int(os.getenv("IVFFLAT_LISTS", "100"))
+IVFFLAT_PROBES = int(os.getenv("IVFFLAT_PROBES", "10"))
 
 @contextmanager
 def get_db_connection():
@@ -40,7 +46,7 @@ def get_db_connection():
             conn.close()
             logger.info("Database connection closed")
 
-def create_table(cursor):
+def create_table_and_index(cursor):
     create_table_query = """
     CREATE TABLE IF NOT EXISTS manual_table (
         id SERIAL PRIMARY KEY,
@@ -52,17 +58,41 @@ def create_table(cursor):
     );
     """
     cursor.execute(create_table_query)
+    logger.info("Table created successfully")
+
+    if INDEX_TYPE == "hnsw":
+        create_index_query = f"""
+        CREATE INDEX IF NOT EXISTS hnsw_manual_vector_idx ON manual_table
+        USING hnsw ((manual_vector::halfvec(3072)) halfvec_ip_ops)
+        WITH (m = {HNSW_M}, ef_construction = {HNSW_EF_CONSTRUCTION});
+        """
+        cursor.execute(create_index_query)
+        logger.info("HNSW index created successfully")
+    elif INDEX_TYPE == "ivfflat":
+        create_index_query = f"""
+        CREATE INDEX IF NOT EXISTS ivfflat_manual_vector_idx ON manual_table
+        USING ivfflat (manual_vector vector_ip_ops)
+        WITH (lists = {IVFFLAT_LISTS});
+        """
+        cursor.execute(create_index_query)
+        # IVFFlat の probes 設定
+        cursor.execute(f"SET ivfflat.probes = {IVFFLAT_PROBES};")
+        logger.info("IVFFlat index created successfully")
+    elif INDEX_TYPE == "none":
+        logger.info("No index created as per configuration")
+    else:
+        raise ValueError(f"Unsupported index type: {INDEX_TYPE}")
 
 def process_csv_file(file_path, conn):
     logger.info(f"Processing CSV file: {file_path}")
     df = pd.read_csv(file_path)
 
     with conn.cursor() as cursor:
-        create_table(cursor)
+        create_table_and_index(cursor)
 
         insert_query = """
         INSERT INTO manual_table (file_name, file_type, location, manual, manual_vector)
-        VALUES (%s, %s, %s, %s, %s::vector);
+        VALUES (%s, %s, %s, %s, %s::vector(3072));
         """
 
         data = []
@@ -73,6 +103,7 @@ def process_csv_file(file_path, conn):
             if len(manual_vector) != 3072:
                 logger.warning(f"Incorrect vector dimension for row. Expected 3072, got {len(manual_vector)}. Skipping.")
                 continue
+
             data.append((row['file_name'], row['file_type'], row['location'], row['manual'], manual_vector))
 
         try:
@@ -92,7 +123,10 @@ def main():
     try:
         with get_db_connection() as conn:
             process_csv_file(csv_file, conn)
-        logger.info("CSV file has been processed and inserted into the database.")
+        if INDEX_TYPE == "none":
+            logger.info("CSV file has been processed and inserted into the database without creating any index.")
+        else:
+            logger.info(f"CSV file has been processed and inserted into the database with {INDEX_TYPE.upper()} index.")
     except Exception as e:
         logger.error(f"An error occurred during processing: {e}")
 
