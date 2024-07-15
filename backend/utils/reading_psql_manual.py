@@ -116,10 +116,9 @@ def compare_float_representations(df):
     # float16 (半精度浮動小数点数)
     vector_f16 = np.array(vector, dtype=np.float16)
 
-    logger.info("最初の10要素の比較:")
-    logger.info(f"元のベクトル:           {vector[:10]}")
-    logger.info(f"float32として解釈:      {vector_f32[:10]}")
-    logger.info(f"float16として解釈:      {vector_f16[:10]}")
+    logger.info(f"元のベクトル:      {vector[:5]}")
+    logger.info(f"float32として解釈: {vector_f32[:5]}")
+    logger.info(f"float16として解釈: {vector_f16[:5]}")
 
 def check_binary_representation(df):
     logger.info("\n------ バイナリ表現の確認 ------")
