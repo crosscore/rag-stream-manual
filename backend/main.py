@@ -1,5 +1,4 @@
 # rag-streaming/backend/main.py
-
 from fastapi import FastAPI, WebSocket, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
@@ -32,15 +31,44 @@ MANUAL_DB_PASSWORD = os.getenv("MANUAL_DB_PASSWORD")
 MANUAL_DB_HOST = os.getenv("MANUAL_DB_INTERNAL_HOST") if os.getenv("IS_DOCKER", "false").lower() == "true" else os.getenv("MANUAL_DB_EXTERNAL_HOST")
 MANUAL_DB_PORT = os.getenv("MANUAL_DB_INTERNAL_PORT") if os.getenv("IS_DOCKER", "false").lower() == "true" else os.getenv("MANUAL_DB_EXTERNAL_PORT")
 S3_DB_EXTERNAL_PORT = os.getenv("S3_DB_EXTERNAL_PORT", "9001")
-DISTANCE_THRESHOLD = float(os.getenv("DISTANCE_THRESHOLD", 0.5))
+SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", 1.0))
+INDEX_TYPE = os.getenv("INDEX_TYPE", "ivfflat").lower()
+VECTOR_DIMENSIONS = 3072
 
-logger.info(f"Application initialized with DISTANCE_THRESHOLD: {DISTANCE_THRESHOLD}")
+logger.info(f"Application initialized with SCORE_THRESHOLD: {SCORE_THRESHOLD} and INDEX_TYPE: {INDEX_TYPE}")
 
 embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
 
 def normalize_vector(vector):
     norm = np.linalg.norm(vector)
     return vector / norm if norm != 0 else vector
+
+def get_search_query(index_type):
+    if index_type == "hnsw":
+        return f"""
+        SELECT file_name, file_type, location, manual,
+                (manual_vector::halfvec({VECTOR_DIMENSIONS}) <#> %s::halfvec({VECTOR_DIMENSIONS})) AS distance
+        FROM manual_table
+        ORDER BY manual_vector::halfvec({VECTOR_DIMENSIONS}) <#> %s::halfvec({VECTOR_DIMENSIONS})
+        LIMIT %s;
+        """
+    elif index_type == "ivfflat":
+        return f"""
+        SELECT file_name, file_type, location, manual,
+                (manual_vector::halfvec({VECTOR_DIMENSIONS}) <#> %s::halfvec({VECTOR_DIMENSIONS})) AS distance
+        FROM manual_table
+        ORDER BY manual_vector::halfvec({VECTOR_DIMENSIONS}) <#> %s::halfvec({VECTOR_DIMENSIONS})
+        LIMIT %s;
+        """
+    else:  # "none" or any other value
+        return f"""
+        SELECT file_name, file_type, location, manual,
+                (manual_vector <#> %s::vector({VECTOR_DIMENSIONS})) AS distance
+        FROM manual_table
+        WHERE (manual_vector <#> %s::vector({VECTOR_DIMENSIONS})) <= %s
+        ORDER BY distance
+        LIMIT %s;
+        """
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -52,9 +80,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 data = await websocket.receive_json()
                 question = data["question"]
                 top_n = data.get("top_n", 3)
-                distance_threshold = data.get("distance_threshold", DISTANCE_THRESHOLD)
+                score_threshold = data.get("score_threshold", SCORE_THRESHOLD)
 
-                logger.info(f"Processing question with top_n={top_n} and distance_threshold={distance_threshold}")
+                logger.info(f"Processing question with top_n={top_n} and score_threshold={score_threshold}")
 
                 question_vector = normalize_vector(embeddings.embed_query(question))
 
@@ -66,15 +94,11 @@ async def websocket_endpoint(websocket: WebSocket):
                     port=MANUAL_DB_PORT
                 ) as conn:
                     with conn.cursor() as cursor:
-                        distance_search_query = """
-                        SELECT file_name, file_type, location, manual,
-                                (manual_vector::halfvec(3072) <#> %s::halfvec(3072)) AS distance
-                        FROM manual_table
-                        WHERE (manual_vector::halfvec(3072) <#> %s::halfvec(3072)) <= %s
-                        ORDER BY distance ASC
-                        LIMIT %s;
-                        """
-                        cursor.execute(distance_search_query, (question_vector.tolist(), question_vector.tolist(), distance_threshold, top_n))
+                        search_query = get_search_query(INDEX_TYPE)
+                        if INDEX_TYPE in ["hnsw", "ivfflat"]:
+                            cursor.execute(search_query, (question_vector.tolist(), question_vector.tolist(), top_n))
+                        else:  # "none" or any other value
+                            cursor.execute(search_query, (question_vector.tolist(), question_vector.tolist(), score_threshold, top_n))
                         results = cursor.fetchall()
 
                 logger.info(f"Query returned {len(results)} results")

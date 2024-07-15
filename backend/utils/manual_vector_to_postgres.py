@@ -20,8 +20,8 @@ BATCH_SIZE = int(os.getenv("BATCH_SIZE", "1000"))
 INDEX_TYPE = os.getenv("INDEX_TYPE", "ivfflat").lower()  # "hnsw", "ivfflat", or "none"
 HNSW_M = int(os.getenv("HNSW_M", "16"))
 HNSW_EF_CONSTRUCTION = int(os.getenv("HNSW_EF_CONSTRUCTION", "256"))
-IVFFLAT_LISTS = int(os.getenv("IVFFLAT_LISTS", "100"))
-IVFFLAT_PROBES = int(os.getenv("IVFFLAT_PROBES", "10"))
+IVFFLAT_LISTS = int(os.getenv("IVFFLAT_LISTS", "20")) # 100
+IVFFLAT_PROBES = int(os.getenv("IVFFLAT_PROBES", "5")) # 10
 VECTOR_DIMENSIONS = 3072
 
 @contextmanager
