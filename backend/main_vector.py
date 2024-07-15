@@ -32,9 +32,9 @@ MANUAL_DB_PASSWORD = os.getenv("MANUAL_DB_PASSWORD")
 MANUAL_DB_HOST = os.getenv("MANUAL_DB_INTERNAL_HOST") if os.getenv("IS_DOCKER", "false").lower() == "true" else os.getenv("MANUAL_DB_EXTERNAL_HOST")
 MANUAL_DB_PORT = os.getenv("MANUAL_DB_INTERNAL_PORT") if os.getenv("IS_DOCKER", "false").lower() == "true" else os.getenv("MANUAL_DB_EXTERNAL_PORT")
 S3_DB_EXTERNAL_PORT = os.getenv("S3_DB_EXTERNAL_PORT", "9001")
-DISTANCE_THRESHOLD = float(os.getenv("DISTANCE_THRESHOLD", 0.5))
+SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", 0.5))
 
-logger.info(f"Application initialized with DISTANCE_THRESHOLD: {DISTANCE_THRESHOLD}")
+logger.info(f"Application initialized with SCORE_THRESHOLD: {SCORE_THRESHOLD}")
 
 embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
 
@@ -52,9 +52,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 data = await websocket.receive_json()
                 question = data["question"]
                 top_n = data.get("top_n", 3)
-                distance_threshold = data.get("distance_threshold", DISTANCE_THRESHOLD)
+                score_threshold = data.get("score_threshold", SCORE_THRESHOLD)
 
-                logger.info(f"Processing question with top_n={top_n} and distance_threshold={distance_threshold}")
+                logger.info(f"Processing question with top_n={top_n} and score_threshold={score_threshold}")
 
                 question_vector = normalize_vector(embeddings.embed_query(question))
 
@@ -66,22 +66,21 @@ async def websocket_endpoint(websocket: WebSocket):
                     port=MANUAL_DB_PORT
                 ) as conn:
                     with conn.cursor() as cursor:
-                        distance_search_query = """
-                        SELECT file_name, file_type, location, manual,
-                                (manual_vector::halfvec(3072) <#> %s::halfvec(3072)) AS distance
+                        similarity_search_query = """
+                        SELECT file_name, file_type, location, manual, manual_vector, (manual_vector <=> %s::vector) AS distance
                         FROM manual_table
-                        WHERE (manual_vector::halfvec(3072) <#> %s::halfvec(3072)) <= %s
+                        WHERE (manual_vector <=> %s::vector) <= %s
                         ORDER BY distance ASC
                         LIMIT %s;
                         """
-                        cursor.execute(distance_search_query, (question_vector.tolist(), question_vector.tolist(), distance_threshold, top_n))
+                        cursor.execute(similarity_search_query, (question_vector.tolist(), question_vector.tolist(), score_threshold, top_n))
                         results = cursor.fetchall()
 
                 logger.info(f"Query returned {len(results)} results")
 
                 formatted_results = []
                 for result in results:
-                    file_name, file_type, location, manual, distance = result
+                    file_name, file_type, location, manual, _, distance = result
                     formatted_result = {
                         "file_name": file_name,
                         "file_type": file_type,
