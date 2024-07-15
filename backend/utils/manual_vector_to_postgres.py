@@ -17,11 +17,12 @@ logger = logging.getLogger(__name__)
 is_docker = os.getenv("IS_DOCKER", "false").lower() == "true"
 CSV_OUTPUT_DIR = os.getenv("CSV_OUTPUT_DIR", "../data/csv/all")
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "1000"))
-INDEX_TYPE = os.getenv("INDEX_TYPE", "hnsw").lower()  # "hnsw", "ivfflat", or "none"
+INDEX_TYPE = os.getenv("INDEX_TYPE", "ivfflat").lower()  # "hnsw", "ivfflat", or "none"
 HNSW_M = int(os.getenv("HNSW_M", "16"))
 HNSW_EF_CONSTRUCTION = int(os.getenv("HNSW_EF_CONSTRUCTION", "256"))
 IVFFLAT_LISTS = int(os.getenv("IVFFLAT_LISTS", "100"))
 IVFFLAT_PROBES = int(os.getenv("IVFFLAT_PROBES", "10"))
+VECTOR_DIMENSIONS = 3072
 
 @contextmanager
 def get_db_connection():
@@ -47,14 +48,14 @@ def get_db_connection():
             logger.info("Database connection closed")
 
 def create_table_and_index(cursor):
-    create_table_query = """
+    create_table_query = f"""
     CREATE TABLE IF NOT EXISTS manual_table (
         id SERIAL PRIMARY KEY,
         file_name TEXT,
         file_type TEXT,
         location TEXT,
         manual TEXT,
-        manual_vector vector(3072)
+        manual_vector vector({VECTOR_DIMENSIONS})
     );
     """
     cursor.execute(create_table_query)
@@ -63,7 +64,7 @@ def create_table_and_index(cursor):
     if INDEX_TYPE == "hnsw":
         create_index_query = f"""
         CREATE INDEX IF NOT EXISTS hnsw_manual_vector_idx ON manual_table
-        USING hnsw ((manual_vector::halfvec(3072)) halfvec_ip_ops)
+        USING hnsw ((manual_vector::halfvec({VECTOR_DIMENSIONS})) halfvec_ip_ops)
         WITH (m = {HNSW_M}, ef_construction = {HNSW_EF_CONSTRUCTION});
         """
         cursor.execute(create_index_query)
@@ -71,7 +72,7 @@ def create_table_and_index(cursor):
     elif INDEX_TYPE == "ivfflat":
         create_index_query = f"""
         CREATE INDEX IF NOT EXISTS ivfflat_manual_vector_idx ON manual_table
-        USING ivfflat (manual_vector vector_ip_ops)
+        USING ivfflat ((manual_vector::halfvec({VECTOR_DIMENSIONS})) halfvec_ip_ops)
         WITH (lists = {IVFFLAT_LISTS});
         """
         cursor.execute(create_index_query)
@@ -90,9 +91,9 @@ def process_csv_file(file_path, conn):
     with conn.cursor() as cursor:
         create_table_and_index(cursor)
 
-        insert_query = """
+        insert_query = f"""
         INSERT INTO manual_table (file_name, file_type, location, manual, manual_vector)
-        VALUES (%s, %s, %s, %s, %s::vector(3072));
+        VALUES (%s, %s, %s, %s, %s::vector({VECTOR_DIMENSIONS}));
         """
 
         data = []
@@ -100,8 +101,8 @@ def process_csv_file(file_path, conn):
             manual_vector = row['manual_vector']
             if isinstance(manual_vector, str):
                 manual_vector = eval(manual_vector)
-            if len(manual_vector) != 3072:
-                logger.warning(f"Incorrect vector dimension for row. Expected 3072, got {len(manual_vector)}. Skipping.")
+            if len(manual_vector) != VECTOR_DIMENSIONS:
+                logger.warning(f"Incorrect vector dimension for row. Expected {VECTOR_DIMENSIONS}, got {len(manual_vector)}. Skipping.")
                 continue
 
             data.append((row['file_name'], row['file_type'], row['location'], row['manual'], manual_vector))
