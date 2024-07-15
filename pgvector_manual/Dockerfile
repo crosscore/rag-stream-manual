@@ -15,7 +15,9 @@ RUN cd /tmp && \
     make && \
     make install
 
-RUN echo "alias ls='ls --color=auto'" >> ~/.bashrc
+RUN echo "alias ls='ls --color=auto'" >> ~/.bashrc && \
+    echo "alias ll='ls -alF'" >> ~/.bashrc && \
+    echo "export PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '" >> ~/.bashrc
 
 COPY init_pgvector.sql /docker-entrypoint-initdb.d/
 

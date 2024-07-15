@@ -11,7 +11,7 @@ import numpy as np
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 is_docker = os.getenv("IS_DOCKER", "false").lower() == "true"

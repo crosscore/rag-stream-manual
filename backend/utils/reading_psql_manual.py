@@ -9,7 +9,7 @@ import ast
 import logging
 import struct
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
 
 load_dotenv()
@@ -169,7 +169,6 @@ def main():
         for i in range(min(10, len(df))):
             logger.info(f"len(df['manual_vector'][{i}]): {len(df['manual_vector'][i])}")
 
-        # 新しい検証関数の呼び出し
         verify_halfvec(engine)
         compare_float_representations(df)
         check_binary_representation(df)
