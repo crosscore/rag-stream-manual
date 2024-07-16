@@ -76,8 +76,6 @@ def create_table_and_index(cursor):
         WITH (lists = {IVFFLAT_LISTS});
         """
         cursor.execute(create_index_query)
-        # IVFFlat の probes 設定
-        cursor.execute(f"SET ivfflat.probes = {IVFFLAT_PROBES};")
         logger.info("IVFFlat index created successfully")
     elif INDEX_TYPE == "none":
         logger.info("No index created as per configuration")
