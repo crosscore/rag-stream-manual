@@ -12,7 +12,7 @@ from contextlib import contextmanager
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
@@ -33,7 +33,7 @@ MANUAL_DB_HOST = os.getenv("MANUAL_DB_INTERNAL_HOST") if os.getenv("IS_DOCKER", 
 MANUAL_DB_PORT = os.getenv("MANUAL_DB_INTERNAL_PORT") if os.getenv("IS_DOCKER", "false").lower() == "true" else os.getenv("MANUAL_DB_EXTERNAL_PORT")
 S3_DB_EXTERNAL_PORT = os.getenv("S3_DB_EXTERNAL_PORT", "9001")
 SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", 1.0))
-INDEX_TYPE = os.getenv("INDEX_TYPE", "ivfflat").lower()
+INDEX_TYPE = os.getenv("INDEX_TYPE", "hnsw").lower()
 VECTOR_DIMENSIONS = 3072
 IVFFLAT_PROBES = int(os.getenv("IVFFLAT_PROBES", "10"))
 HNSW_EF_SEARCH = int(os.getenv("HNSW_EF_SEARCH", "200"))

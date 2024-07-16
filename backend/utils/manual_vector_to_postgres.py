@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 is_docker = os.getenv("IS_DOCKER", "false").lower() == "true"
 CSV_OUTPUT_DIR = os.getenv("CSV_OUTPUT_DIR", "../data/csv/all")
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "1000"))
-INDEX_TYPE = os.getenv("INDEX_TYPE", "ivfflat").lower()  # "hnsw", "ivfflat", or "none"
+INDEX_TYPE = os.getenv("INDEX_TYPE", "hnsw").lower()  # "hnsw", "ivfflat", or "none"
 HNSW_M = int(os.getenv("HNSW_M", "16"))
 HNSW_EF_CONSTRUCTION = int(os.getenv("HNSW_EF_CONSTRUCTION", "256"))
 IVFFLAT_LISTS = int(os.getenv("IVFFLAT_LISTS", "20")) # 100
