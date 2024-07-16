@@ -49,7 +49,7 @@ def get_search_query(index_type):
         SELECT file_name, file_type, location, manual,
                 (manual_vector::halfvec({VECTOR_DIMENSIONS}) <#> %s::halfvec({VECTOR_DIMENSIONS})) AS distance
         FROM manual_table
-        ORDER BY manual_vector::halfvec({VECTOR_DIMENSIONS}) <#> %s::halfvec({VECTOR_DIMENSIONS})
+        ORDER BY distance ASC
         LIMIT %s;
         """
     elif index_type == "ivfflat":
@@ -57,7 +57,7 @@ def get_search_query(index_type):
         SELECT file_name, file_type, location, manual,
                 (manual_vector::halfvec({VECTOR_DIMENSIONS}) <#> %s::halfvec({VECTOR_DIMENSIONS})) AS distance
         FROM manual_table
-        ORDER BY manual_vector::halfvec({VECTOR_DIMENSIONS}) <#> %s::halfvec({VECTOR_DIMENSIONS})
+        ORDER BY distance ASC
         LIMIT %s;
         """
     else:  # "none" or any other value
@@ -66,7 +66,7 @@ def get_search_query(index_type):
                 (manual_vector <#> %s::vector({VECTOR_DIMENSIONS})) AS distance
         FROM manual_table
         WHERE (manual_vector <#> %s::vector({VECTOR_DIMENSIONS})) <= %s
-        ORDER BY distance
+        ORDER BY distance ASC
         LIMIT %s;
         """
 
