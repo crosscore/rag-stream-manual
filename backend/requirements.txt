@@ -1,3 +1,5 @@
+# backend/requirements.txt
+
 langchain==0.1.20
 numpy==1.26.4
 openai==1.30.1
