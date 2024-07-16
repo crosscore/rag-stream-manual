@@ -20,7 +20,7 @@ services:
     volumes:
       - ./backend:/app
     depends_on:
-      - pgvector_manual
+      - pgvector_db
       - s3_db
     env_file:
       - .env
@@ -44,11 +44,11 @@ services:
       - app-network
     command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 
-  pgvector_manual:
-    build: ./pgvector_manual
+  pgvector_db:
+    build: ./pgvector_db
     volumes:
-      - ./pgvector_manual/init_pgvector.sql:/docker-entrypoint-initdb.d/init_pgvector.sql
-      - pgvector_manual_data:/var/lib/postgresql/data
+      - ./pgvector_db/init_pgvector.sql:/docker-entrypoint-initdb.d/init_pgvector.sql
+      - pgvector_db_data:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=${MANUAL_DB_NAME}
       - POSTGRES_USER=${MANUAL_DB_USER}
@@ -73,4 +73,4 @@ networks:
     driver: bridge
 
 volumes:
-  pgvector_manual_data:
+  pgvector_db_data:

@@ -82,7 +82,7 @@ TOC_DB_EXTERNAL_PORT=5433
 MANUAL_DB_NAME=manualdb
 MANUAL_DB_USER=user
 MANUAL_DB_PASSWORD=password
-MANUAL_DB_INTERNAL_HOST=pgvector_manual
+MANUAL_DB_INTERNAL_HOST=pgvector_db
 MANUAL_DB_INTERNAL_PORT=5432
 MANUAL_DB_EXTERNAL_HOST=localhost
 MANUAL_DB_EXTERNAL_PORT=5434
@@ -96,7 +96,7 @@ service:
     volumes:
       - ./backend:/app
     depends_on:
-      - pgvector_manual
+      - pgvector_db
       - s3_db
     env_file:
       - .env

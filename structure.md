@@ -15,7 +15,7 @@ rag-streaming/
 │   └── utils/
 │       └── vectorizer.py
 │
-├── pgvector_manual/
+├── pgvector_db/
 │   ├── Dockerfile
 │   └── init_pgvector.sql
 │

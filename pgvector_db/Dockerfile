@@ -1,4 +1,4 @@
-# rag-streaming/pgvector_manual/Dockerfile
+# rag-streaming/pgvector_db/Dockerfile
 
 FROM postgres:latest
 
