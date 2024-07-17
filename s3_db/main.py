@@ -1,5 +1,3 @@
-# rag-streaming/s3_db/main.py
-
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,19 +30,22 @@ async def serve_file(file_type: str, filename: str, page: int = Query(None)):
         raise HTTPException(status_code=404, detail="File not found")
 
     if file_type.lower() == 'pdf' and page is not None:
-        return stream_pdf_page(file_path, page)
+        return stream_pdf_surrounding_pages(file_path, page)
 
     return FileResponse(file_path)
 
-def stream_pdf_page(file_path: str, page: int):
+def stream_pdf_surrounding_pages(file_path: str, page: int):
     try:
         reader = PdfReader(file_path)
         writer = PdfWriter()
 
-        if 0 <= page - 1 < len(reader.pages):
-            writer.add_page(reader.pages[page - 1])
-        else:
-            raise HTTPException(status_code=404, detail="Page not found")
+        # Start 1 page before the given page, ensuring we don't go below 0
+        start_page = max(0, page - 2)
+        # End 1 page after the given page, ensuring we don't go beyond the last page
+        end_page = min(len(reader.pages), page + 1)
+
+        for i in range(start_page, end_page + 1):  # Include the end page
+            writer.add_page(reader.pages[i])
 
         output = BytesIO()
         writer.write(output)
